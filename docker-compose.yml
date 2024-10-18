@@ -1,0 +1,119 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: "production"
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL_EXTERNAL: ${DATABASE_URL_EXTERNAL}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      AUTH_URL: ${AUTH_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
+      NEXT_PUBLIC_CLIENTVAR: ${NEXT_PUBLIC_CLIENTVAR}
+    depends_on:
+      - postgres
+    networks:
+      - acme_network
+
+  postgres:
+    image: "postgres:16.3-alpine"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - type: bind
+        source: ./keycloak/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        read_only: true
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+    networks:
+      - acme_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pg_proxy:
+    image: ghcr.io/neondatabase/wsproxy:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APPEND_PORT: "postgres:5432"
+      ALLOW_ADDR_REGEX: ".*"
+      LOG_TRAFFIC: "true"
+    ports:
+      - "5433:80"
+    networks:
+      - acme_network
+
+  keycloak:
+    image: "quay.io/keycloak/keycloak:25.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - "start-dev"
+      - --import-realm
+    ports:
+      - "8080:8080"
+      - "9000:9000"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      KC_DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      KC_DB_USERNAME: "${POSTGRES_USER}"
+      KC_DB_SCHEMA: "keycloak"
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true" # Abilita HTTP
+      KC_HTTP_RELATIVE_PATH: "/auth"
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/auth"
+      KC_PROXY_PROTOCOL_ENABLED: "true"
+      KC_PROXY_HEADERS: "xforwarded"
+      KEYCLOAK_ADMIN: "${KEYCLOAK_ADMIN}"
+      KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+    volumes:
+      - ./keycloak/realm.json:/opt/keycloak/data/import/realm.json
+    networks:
+      - acme_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /auth/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cron:
+    image: alpine/curl
+    command: >
+      sh -c "
+        echo '*/10 * * * * curl -X POST http://app:3000/api/db/clear' > /etc/crontabs/root && \
+        crond -f -l 2
+      "
+    depends_on:
+      - app
+    networks:
+      - acme_network
+
+volumes:
+  postgres_data:
+
+networks:
+  acme_network:
+    name: acme_network
+    driver: bridge
