@@ -12,19 +12,10 @@ export const env = createEnv({
     POSTGRES_DB: z.string(),
     POSTGRES_PASSWORD: z.string(),
     POSTGRES_USER: z.string(),
+    SERVERVAR: z.string(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-
-    AUTH_URL: z.string().url(),
-    AUTH_SECRET:
-      process.env.NODE_ENV === "production"
-        ? z.string().min(1)
-        : z.string().min(1).optional(),
-
-    KEYCLOAK_CLIENT_ID: z.string().min(1),
-    KEYCLOAK_CLIENT_SECRET: z.string().min(1),
-    KEYCLOAK_ISSUER: z.string().min(1),
   },
 
   /**
@@ -47,11 +38,7 @@ export const env = createEnv({
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
     POSTGRES_USER: process.env.POSTGRES_USER,
     NODE_ENV: process.env.NODE_ENV,
-    AUTH_URL: process.env.AUTH_URL,
-    AUTH_SECRET: process.env.AUTH_SECRET,
-    KEYCLOAK_CLIENT_ID: process.env.KEYCLOAK_CLIENT_ID,
-    KEYCLOAK_CLIENT_SECRET: process.env.KEYCLOAK_CLIENT_SECRET,
-    KEYCLOAK_ISSUER: process.env.KEYCLOAK_ISSUER,
+    SERVERVAR: process.env.SERVERVAR,
     NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**

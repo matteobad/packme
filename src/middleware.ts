@@ -1,19 +1,16 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { auth } from "./server/auth";
+export function middleware(request: NextRequest) {
+  const protectedCookie = request.cookies.get("protected");
 
-export default auth((request) => {
-  const session = request.auth;
-
-  if (!session) {
+  if (protectedCookie?.value !== "1") {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();
-});
+}
 
-// Read more: https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
 export const config = {
-  // If you only want to secure certain pages
-  matcher: ["/protected"],
+  matcher: "/protected",
 };

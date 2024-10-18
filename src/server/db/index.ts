@@ -3,7 +3,6 @@ import { drizzle } from "drizzle-orm/neon-serverless";
 import { connectionStr } from "drizzle.config";
 
 import { env } from "~/env";
-import * as auth from "./schema/auth";
 import * as post from "./schema/post";
 
 /**
@@ -18,6 +17,6 @@ const conn =
   globalForDb.conn ?? new Pool({ connectionString: connectionStr.toString() });
 if (env.NODE_ENV !== "production") globalForDb.conn = conn;
 
-export const schema = { ...auth, ...post };
+export const schema = { ...post };
 
 export const db = drizzle(conn, { schema: schema, logger: true });
